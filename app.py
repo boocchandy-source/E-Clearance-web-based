@@ -14,6 +14,7 @@ from datetime import datetime
 from functools import wraps
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import click
 from flask import (
     Flask, abort, flash, g, jsonify, redirect, render_template, request, session, url_for,
 )
@@ -36,20 +37,71 @@ def env_flag(name, default=False):
 IS_RENDER = env_flag("RENDER") or bool(os.environ.get("RENDER_EXTERNAL_HOSTNAME"))
 IS_PRODUCTION = IS_RENDER or os.environ.get("FLASK_ENV", "").lower() == "production"
 
+# On Render, the persistent disk is mounted at /var/data (see render.yaml).
+# Locally the SQLite file stays next to app.py, so `python app.py` keeps working.
+DB_PATH = os.path.abspath(os.environ.get("DB_PATH") or os.path.join(BASE_DIR, "eclearance.db"))
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
+
+def load_secret_key():
+    """Return a stable session-signing key.
+
+    render.yaml generates SECRET_KEY in production. When it is missing (for
+    example on a manually-created Render service), persist a generated key
+    beside the SQLite database so a restart does not log everyone out. On the
+    paid disk this survives redeploys; on the free plan it survives restarts
+    but not redeploys, so setting SECRET_KEY in the dashboard is still best.
+    """
+    configured = os.environ.get("SECRET_KEY", "").strip()
+    if configured:
+        return configured
+
+    key_path = os.path.join(os.path.dirname(DB_PATH), ".secret_key")
+    try:
+        with open(key_path, "r", encoding="utf-8") as fh:
+            saved = fh.read().strip()
+        if saved:
+            return saved
+    except FileNotFoundError:
+        pass
+    except OSError:
+        LOG.warning("Could not read %s; using an ephemeral SECRET_KEY.", key_path)
+        return secrets.token_hex(32)
+
+    key = secrets.token_hex(32)
+    try:
+        fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        # A concurrent worker won the race; use the key it wrote.
+        try:
+            with open(key_path, "r", encoding="utf-8") as fh:
+                saved = fh.read().strip()
+            if saved:
+                return saved
+        except OSError:
+            pass
+        return key
+    except OSError as exc:
+        LOG.warning("Could not persist SECRET_KEY at %s (%s); using an ephemeral key.", key_path, exc)
+        return key
+
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(key)
+    LOG.warning(
+        "SECRET_KEY is not set; generated one at %s. Set SECRET_KEY in the "
+        "Render dashboard (or use render.yaml) for sessions that survive redeploys.",
+        key_path,
+    )
+    return key
+
+
 app = Flask(__name__)
 # Render terminates TLS at its proxy; trust exactly one forwarded hop.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # A stable SECRET_KEY keeps sessions and CSRF tokens valid across restarts.
 # render.yaml generates one automatically.
-secret_key = os.environ.get("SECRET_KEY", "").strip()
-if not secret_key:
-    if IS_PRODUCTION:
-        secret_key = secrets.token_hex(32)
-        LOG.warning("SECRET_KEY is not set. Generated an ephemeral key; sessions reset on restart.")
-    else:
-        secret_key = "tcc-eclearance-dev-only-secret"
-app.secret_key = secret_key
+app.secret_key = load_secret_key()
 
 # Signatures are posted as base64 data URLs (~2.7 MB for a 2 MB image) and the
 # default 500 kB form-field cap in Flask 3.1 would reject them.
@@ -62,11 +114,6 @@ app.config.update(
 )
 
 csrf = CSRFProtect(app)
-
-# On Render, the persistent disk is mounted at /var/data (see render.yaml).
-# Locally the SQLite file stays next to app.py, so `python app.py` keeps working.
-DB_PATH = os.path.abspath(os.environ.get("DB_PATH") or os.path.join(BASE_DIR, "eclearance.db"))
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 # The school is in the Philippines; keep signature timestamps in local time.
 try:
@@ -82,6 +129,11 @@ def now_str():
 
 # Demo accounts are useful for evaluation but must be replaced for real use.
 SEED_DEMO_ACCOUNTS = env_flag("SEED_DEMO_ACCOUNTS", default=True)
+if IS_PRODUCTION and SEED_DEMO_ACCOUNTS:
+    LOG.warning(
+        "SEED_DEMO_ACCOUNTS is enabled. On an empty database this creates demo "
+        "accounts with known passwords; set SEED_DEMO_ACCOUNTS=0 for a real install."
+    )
 
 # Set this to let faculty self-register; its value becomes the required access
 # code. On Render, faculty signup stays closed while it is unset.
@@ -380,6 +432,127 @@ def init_db():
             )
     db.commit()
     db.close()
+
+
+# ---------- Account management (Render Shell) ----------
+@app.cli.command("create-user")
+@click.option("--role", type=click.Choice(["student", "faculty"]), required=True)
+@click.option("--name", "full_name", prompt="Full name")
+@click.option("--school-id", prompt="School ID")
+@click.option("--email", prompt="Email")
+@click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+@click.option("--department", default="", help="Faculty office (one of the 16 departments).")
+@click.option("--course", default="", help="Student course, e.g. BSIT.")
+@click.option("--year-level", default="", help="Student year level, e.g. 2nd Year.")
+@click.option("--subject", "subjects", multiple=True,
+              help="Subject-instructor assignment; repeat for each subject.")
+def create_user_command(role, full_name, school_id, email, password,
+                        department, course, year_level, subjects):
+    """Create a student or faculty account without the public registration form."""
+    from werkzeug.security import generate_password_hash
+
+    full_name = full_name.strip()
+    school_id = school_id.strip()
+    email = email.strip().lower()
+    department = department.strip()
+    course = course.strip()
+    year_level = year_level.strip()
+
+    if not full_name or not school_id or not email:
+        raise click.ClickException("Name, school ID, and email are required.")
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        raise click.ClickException("Enter a valid email address.")
+    if len(password) < 8:
+        raise click.ClickException("Password must be at least 8 characters long.")
+
+    subject_lookup = {name.upper(): name for name, _ in SECOND_YEAR_SUBJECTS}
+    assigned_subjects = []
+    for raw in subjects:
+        subject = subject_lookup.get(raw.strip().upper())
+        if not subject:
+            valid = ", ".join(s for s, _ in SECOND_YEAR_SUBJECTS)
+            raise click.ClickException(f"Unknown subject '{raw}'. Valid subjects: {valid}")
+        if subject not in assigned_subjects:
+            assigned_subjects.append(subject)
+
+    if assigned_subjects and role != "faculty":
+        raise click.ClickException("Only faculty accounts can be assigned subjects.")
+    if assigned_subjects and department:
+        raise click.ClickException("Use --subject for instructors, not --department.")
+    if role == "faculty" and not assigned_subjects:
+        if department not in DEPARTMENTS:
+            raise click.ClickException(
+                "--department must be one of: " + ", ".join(DEPARTMENTS)
+            )
+    if assigned_subjects:
+        department = "Subject Instructor"
+
+    db = get_db()
+    try:
+        cur = db.execute(
+            "INSERT INTO users (role, full_name, school_id, email, password_hash, department, course, year_level) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (role, full_name, school_id, email, generate_password_hash(password),
+             department, course, year_level),
+        )
+        user_id = cur.lastrowid
+        for subject in assigned_subjects:
+            db.execute(
+                "INSERT OR IGNORE INTO instructor_subjects (user_id, subject) VALUES (?,?)",
+                (user_id, subject),
+            )
+        db.commit()
+    except sqlite3.IntegrityError as exc:
+        db.rollback()
+        raise click.ClickException("That email or school ID already exists.") from exc
+
+    click.echo(f"Created {role} #{user_id}: {full_name} <{email}>")
+    if assigned_subjects:
+        click.echo("Assigned subjects: " + ", ".join(assigned_subjects))
+    else:
+        click.echo("Scope: " + (department or course or "student"))
+
+
+@app.cli.command("set-password")
+@click.option("--email", prompt="Email")
+@click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+def set_password_command(email, password):
+    """Change an account password from the Render Shell."""
+    from werkzeug.security import generate_password_hash
+
+    email = email.strip().lower()
+    if len(password) < 8:
+        raise click.ClickException("Password must be at least 8 characters long.")
+
+    db = get_db()
+    user = db.execute("SELECT id, full_name FROM users WHERE email=?", (email,)).fetchone()
+    if not user:
+        raise click.ClickException(f"No account found for {email}.")
+    db.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (generate_password_hash(password), user["id"]),
+    )
+    db.commit()
+    click.echo(f"Password updated for {user['full_name']} <{email}>.")
+
+
+@app.cli.command("list-users")
+def list_users_command():
+    """List accounts, roles, and scopes (useful after a fresh deploy)."""
+    rows = get_db().execute(
+        "SELECT id, role, full_name, email, department, course, year_level "
+        "FROM users ORDER BY role, full_name"
+    ).fetchall()
+    if not rows:
+        click.echo("No accounts yet. Run create-user or enable SEED_DEMO_ACCOUNTS.")
+        return
+    click.echo(f"{len(rows)} account(s):")
+    for row in rows:
+        scope = row["department"] or " ".join(
+            part for part in (row["course"], row["year_level"]) if part
+        ) or "-"
+        click.echo(f"  #{row['id']:<3} {row['role']:<8} {row['full_name']} <{row['email']}>  [{scope}]")
+
 
 def current_user():
     if "user_id" not in session:

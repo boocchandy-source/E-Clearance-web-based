@@ -11,6 +11,7 @@ env/
 .env.*
 !.env.example
 credentials.txt
+.secret_key
 
 # Local SQLite database (production uses the Render disk)
 eclearance.db

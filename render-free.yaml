@@ -1,0 +1,37 @@
+# Render Blueprint for a FREE demo deployment of the TCC eClearance system.
+#
+# IMPORTANT: Render's free plan has no persistent disk. The SQLite database is
+# stored in the service's temporary filesystem, so all accounts, clearance
+# requests, and e-signatures are lost whenever the service redeploys, restarts,
+# or wakes from sleep. Use this for evaluation only.
+#
+# For a deployment that keeps data, use render.yaml (paid instance + 1 GB disk).
+#
+# Deploy: Render Dashboard > New > Blueprint > pick this repository, then set
+# "Blueprint file path" to render-free.yaml.
+services:
+  - type: web
+    name: tcc-eclearance-demo
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app -c gunicorn.conf.py
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: SECRET_KEY
+        generateValue: true
+      - key: APP_TIMEZONE
+        value: Asia/Manila
+      - key: TZ
+        value: Asia/Manila
+      - key: SEED_DEMO_ACCOUNTS
+        value: "1"
+      # Prompted once when the Blueprint is created. Leave blank to keep faculty
+      # self-registration closed; set a code to open it.
+      - key: FACULTY_SIGNUP_CODE
+        sync: false
+      # No DB_PATH: the SQLite file lives beside app.py on the ephemeral disk.
