@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+credentials.txt
+
+# Local SQLite database (production uses the Render disk)
+eclearance.db
+eclearance.db-wal
+eclearance.db-shm
+eclearance.db-journal
+*.sqlite3
+
+# Local screenshots / student documents / exports
+screenshots/
+TCC_Clearance_Certificate*.docx
+
+# Tooling / build leftovers
+.next/
+.pytest_cache/
+.DS_Store
+Thumbs.db

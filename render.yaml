@@ -1,0 +1,33 @@
+# Render Blueprint for the TCC eClearance system.
+# Deploy: push this folder to GitHub, then Render Dashboard > New > Blueprint.
+services:
+  - type: web
+    name: tcc-eclearance
+    runtime: python
+    plan: 0.5c-512mb
+    region: singapore
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app -c gunicorn.conf.py
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DB_PATH
+        value: /var/data/eclearance.db
+      - key: APP_TIMEZONE
+        value: Asia/Manila
+      - key: TZ
+        value: Asia/Manila
+      - key: SEED_DEMO_ACCOUNTS
+        value: "1"
+      # Optional. Set a value to allow faculty self-registration with that
+      # access code. Leave blank to keep faculty signup closed on Render.
+      - key: FACULTY_SIGNUP_CODE
+        sync: false
+    disk:
+      name: eclearance-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+{% block title %}Clearance #{{ clearance['id'] }}{% endblock %}
+{% block content %}
+<div class="no-print" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+  <a class="link" href="{{ url_for('dashboard') }}">&larr; Back to dashboard</a>
+  <span class="pill {{ 'pill-active' if cleared else ('pill-inactive' if clearance['status']=='needs_revision' else 'pill-pending') }}">{{ clearance['status']|status_label }}</span>
+</div>
+
+<div class="cert{% if not cleared %} cert-locked{% endif %}" id="printArea">
+  <div class="print-locked-note">
+    <h2>CLEARANCE NOT YET COMPLETED</h2>
+    <p>This certificate cannot be printed yet. Only <b>{{ signed }} of {{ total_signatures }}</b> required signatures are in.</p>
+    {% if pending_offices %}<p><b>Offices still waiting:</b> {{ pending_offices|join(', ') }}</p>{% endif %}
+    {% if pending_instructors %}<p><b>Instructor signatures still needed:</b> {{ pending_instructors|join(', ') }}</p>{% endif %}
+    <p>The student may monitor the status anytime on their dashboard.</p>
+  </div>
+  {% if cleared %}
+  <div class="cleared-stamp" role="img" aria-label="Clearance cleared">CLEARED</div>
+  {% endif %}
+  <div class="cert-head">
+    <img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="Torres Capitol College logo">
+    <div>
+      <h2>TORRES CAPITOL COLLEGE</h2>
+      <p class="muted small">Domine, Dirige Nos &middot; Est. 1997</p>
+      <h3>STUDENT CLEARANCE CERTIFICATE</h3>
+    </div>
+    <img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="TCC seal">
+  </div>
+
+  <div class="cert-meta grid-3">
+    <div><small>Clearance no.</small><strong>#{{ clearance['id'] }}</strong></div>
+    <div><small>Status</small><strong><span class="badge {{ clearance['status'] }}">{{ clearance['status']|status_label }}</span></strong></div>
+    <div><small>Date filed</small><strong>{{ clearance['created_at'] }}</strong></div>
+    <div><small>Student name</small><strong>{{ clearance['student_name'] }}</strong></div>
+    <div><small>ID number</small><strong>{{ clearance['student_no'] }}</strong></div>
+    <div><small>Course / Year</small><strong>{{ clearance['course'] }} {{ clearance['year_level'] }}</strong></div>
+    <div><small>School year</small><strong>{{ clearance['school_year'] }}</strong></div>
+    <div><small>Semester</small><strong>{{ clearance['semester'] }}</strong></div>
+    <div><small>Purpose</small><strong>{{ clearance['purpose'] }}</strong></div>
+  </div>
+
+  <h3 class="sig-title">Office approvals &amp; e-signatures <span class="muted small">— {{ approvals|length }} offices in official order</span></h3>
+  <div class="sig-table">
+    {% for a in approvals %}
+    <div class="sig-row {{ a['status'] }}">
+      <div class="sig-office"><b>{{ loop.index }}. {{ a['department'] }}</b><br>
+        {% if a['status'] == 'approved' %}<span class="pill pill-active">Signed</span>
+        {% elif a['status'] == 'declined' %}<span class="pill pill-inactive">Declined</span>
+        {% else %}<span class="pill pill-pending">Pending</span>{% endif %}
+      </div>
+      <div class="sig-name">
+        {% if a['faculty_name'] %}
+          <b>{{ a['faculty_name'] }}</b> <small class="muted">({{ a['faculty_no'] }})</small>
+        {% else %}
+          <span class="muted">Awaiting {{ a['department'] }} reviewer</span>
+        {% endif %}
+        {% if a['remarks'] %}<div class="remarks">Remarks: {{ a['remarks'] }}</div>{% endif %}
+        {% if a['signed_at'] %}<small class="muted">Signed: {{ a['signed_at'] }}</small>{% endif %}
+      </div>
+      <div class="sig-img">
+        {% if a['signature_data'] and a['signature_data'].startswith('data:') %}
+          <img src="{{ a['signature_data'] }}" alt="E-signature of {{ a['faculty_name'] }}">
+          <small class="muted">e-signature</small>
+        {% elif a['signature_data'] and a['signature_data'].startswith('TEXT:') %}
+          <div class="sig-typed big">{{ a['signature_data'][5:] }}</div>
+          <small class="muted">e-signature (typed)</small>
+        {% else %}
+          <span class="muted small">No signature yet</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if instructor_approvals %}
+  <h3 class="sig-title">Subject instructors' e-signatures <span class="muted small">— {{ instructor_approvals|length }} subjects for {{ clearance['year_level'] }}</span></h3>
+  <div class="sig-table">
+    {% for a in instructor_approvals %}
+    <div class="sig-row instructor {{ a['status'] }}">
+      <div class="sig-office"><b>{{ loop.index }}. {{ a['subject'] }}</b><br>
+        {% if a['status'] == 'approved' %}<span class="pill pill-active">Signed</span>
+        {% elif a['status'] == 'declined' %}<span class="pill pill-inactive">Declined</span>
+        {% else %}<span class="pill pill-pending">Pending</span>{% endif %}
+      </div>
+      <div class="sig-name">
+        <b>{{ a['instructor_name'] }}</b>
+        {% if a['remarks'] %}<div class="remarks">Remarks: {{ a['remarks'] }}</div>{% endif %}
+        {% if a['signed_at'] %}<small class="muted">Signed: {{ a['signed_at'] }}</small>{% endif %}
+      </div>
+      <div class="sig-img">
+        {% if a['signature_data'] and a['signature_data'].startswith('data:') %}
+          <img src="{{ a['signature_data'] }}" alt="E-signature of {{ a['instructor_name'] }}">
+          <small class="muted">e-signature</small>
+        {% elif a['signature_data'] and a['signature_data'].startswith('TEXT:') %}
+          <div class="sig-typed big">{{ a['signature_data'][5:] }}</div>
+          <small class="muted">e-signature (typed)</small>
+        {% else %}
+          <span class="muted small">No signature yet</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <p class="muted small center">
+    {% if cleared %}
+      Cleared — all {{ total_signatures }} required signatories have signed. This certificate may be printed anytime.
+    {% else %}
+      This clearance is not yet complete. The certificate is locked until every required signatory has signed.
+    {% endif %}
+  </p>
+</div>
+
+<div class="card no-print">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    {% if cleared %}
+    <button class="btn btn-dark" onclick="window.print()">Download / Print certificate</button>
+    {% if not print_mode %}<a class="btn btn-gold" href="{{ url_for('certificate', cid=clearance['id']) }}">Open print view</a>{% endif %}
+    {% else %}
+    <button class="btn btn-dark" disabled title="Available after all {{ total_signatures }} signatories sign">Download / Print certificate (locked)</button>
+    <span class="muted small">{{ signed }}/{{ total_signatures }} signatures collected — unlocks automatically when all have signed.</span>
+    {% endif %}
+    <a class="btn btn-outline" href="{{ url_for('dashboard') }}">Back to dashboard</a>
+  </div>
+  {% if not cleared %}
+  <div class="alert warn" style="margin-top:14px">
+    <b>Printing is disabled.</b> Remaining signatories:
+    {% if pending_offices %}{{ pending_offices|join(', ') }}{% endif %}{% if pending_offices and pending_instructors %} &middot; {% endif %}{% if pending_instructors %}{{ pending_instructors|join(', ') }} (subject instructors){% endif %}{% if not pending_offices and not pending_instructors %}waiting for assigned signatories{% endif %}.
+    The status on the student dashboard will show <b>Cleared</b> once every signature is in.
+  </div>
+  {% endif %}
+  {% if user['role']=='faculty' and not cleared and (my_actionable_subjects or not user_is_instructor) %}
+  <hr>
+  {% if user_is_instructor %}
+  <h3>Instructor action — {{ my_actionable_subjects|map(attribute='subject')|join(', ') }}</h3>
+  <p class="muted small">Sign each subject assigned to you. Approvals require an e-signature — draw it, type it, or upload a picture of your signature. Declines notify the student to comply.</p>
+  {% else %}
+  <h3>Instructor action — {{ user['department'] }}</h3>
+  <p class="muted small">Approvals require an e-signature — draw it, type it, or upload a picture of your signature. Declines notify the student to comply.</p>
+  {% endif %}
+  <form method="POST" action="{{ url_for('faculty_review', cid=clearance['id']) }}" class="form" id="reviewForm" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if user_is_instructor %}
+    <label for="subjectSel">Subject being signed
+      <select name="subject" id="subjectSel" required>
+        {% for a in my_actionable_subjects %}
+        <option value="{{ a['subject'] }}">{{ a['subject'] }} — {{ a['status']|status_label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <div class="grid-2">
+      <label for="actionSel">Decision
+        <select name="action" id="actionSel">
+          <option value="approved">Approve + e-sign</option>
+          <option value="declined">Decline (notify student)</option>
+        </select>
+      </label>
+      <label for="remarks">Remarks (required if declining)
+        <input id="remarks" name="remarks" placeholder="{{ 'Missing project / requirement…' if user_is_instructor else 'Unreturned book / unpaid balance…' }}" autocomplete="off">
+      </label>
+    </div>
+    <div id="sigBlock">
+      <label class="sig-label">E-signature <span class="muted small">(required to approve)</span></label>
+      <div class="tabs sig-tabs" role="tablist" aria-label="Choose how to sign">
+        <button type="button" class="tab active" id="tabDraw" role="tab" aria-selected="true" aria-controls="panelDraw" data-mode="draw">Draw</button>
+        <button type="button" class="tab" id="tabType" role="tab" aria-selected="false" aria-controls="panelType" data-mode="type">Type</button>
+        <button type="button" class="tab" id="tabUpload" role="tab" aria-selected="false" aria-controls="panelUpload" data-mode="upload">Upload photo</button>
+      </div>
+
+      <div class="sig-panel" id="panelDraw" role="tabpanel" aria-labelledby="tabDraw">
+        <canvas id="sigPad" width="500" height="160"></canvas>
+        <div class="sig-tools">
+          <button type="button" class="btn btn-sm btn-outline" id="clearSig">Clear</button>
+          <span class="muted small">Draw with your mouse, trackpad, or finger.</span>
+        </div>
+      </div>
+
+      <div class="sig-panel" id="panelType" role="tabpanel" aria-labelledby="tabType" hidden>
+        <input name="typed_signature" id="typedSig" placeholder="Type your full name as signature" autocomplete="off">
+        <div class="sig-typed-preview" id="typedPreview" aria-hidden="true"></div>
+        <p class="muted small">Your typed name will appear in a script style on the clearance.</p>
+      </div>
+
+      <div class="sig-panel" id="panelUpload" role="tabpanel" aria-labelledby="tabUpload" hidden>
+        <input type="file" name="signature_file" id="sigFile" accept="image/png,image/jpeg,image/webp" hidden>
+        <div class="sig-drop" id="sigDrop" tabindex="0" role="button" aria-controls="sigFile">
+          <span class="sig-drop-icon" aria-hidden="true">&#8679;</span>
+          <b>Choose a picture of your signature</b>
+          <span class="muted small">Click here, drag &amp; drop a file, or paste an image (Ctrl+V)</span>
+          <span class="muted small">PNG, JPG, or WebP &middot; up to 2 MB</span>
+        </div>
+        <div class="sig-upload-preview" id="sigPreviewWrap" hidden>
+          <img id="sigPreview" alt="Preview of the uploaded signature">
+          <div class="sig-upload-actions">
+            <span class="muted small" id="sigFileInfo"></span>
+            <button type="button" class="btn btn-sm btn-outline" id="replaceSig">Choose another</button>
+            <button type="button" class="btn btn-sm btn-outline" id="removeSig">Remove</button>
+          </div>
+        </div>
+        <p class="muted small" id="sigUploadMsg" role="status" aria-live="polite"></p>
+        <p class="muted small"><b>Tip:</b> sign on plain white paper, take a close-up photo, and keep only the signature in the frame. The image is cleaned up automatically.</p>
+      </div>
+
+      <input type="hidden" name="signature_data" id="sigData">
+    </div>
+    <button class="btn btn-gold" type="submit">Submit decision</button>
+  </form>
+  {% elif cleared %}
+    <div class="alert ok"><b>Cleared.</b> All {{ total_signatures }} required signatures have been collected. The student can view this status and print the certificate anytime from their dashboard.</div>
+  {% elif clearance['status']=='needs_revision' %}
+    <div class="alert warn">An {{ 'office or instructor' if instructor_approvals else 'office' }} declined — read the remarks above, comply, then file a new request.</div>
+  {% elif user_is_instructor and my_subject_rows %}
+    <div class="alert ok">You have e-signed all your assigned subjects for this clearance. Waiting on the remaining offices and instructors.</div>
+  {% elif user_is_instructor %}
+    <div class="alert">No subject-instructor signatures are assigned to you for this clearance.</div>
+  {% else %}
+    <div class="alert">Waiting on remaining {{ 'offices and instructors' if instructor_approvals else 'offices' }}. Track each signature above.</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const form = document.getElementById('reviewForm');
+  if(!form) return;
+
+  const sigData = document.getElementById('sigData');
+  const actionSel = document.getElementById('actionSel');
+
+  /* ---------- signature method tabs ---------- */
+  const tabs = Array.from(document.querySelectorAll('.sig-tabs .tab'));
+  const panels = {
+    draw: document.getElementById('panelDraw'),
+    type: document.getElementById('panelType'),
+    upload: document.getElementById('panelUpload')
+  };
+  let mode = 'draw';
+
+  function setMode(next){
+    mode = next;
+    tabs.forEach(t=>{
+      const on = t.dataset.mode === next;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+    });
+    Object.keys(panels).forEach(k=>{ panels[k].hidden = k !== next; });
+  }
+  tabs.forEach((t,i)=>{
+    t.addEventListener('click', ()=>setMode(t.dataset.mode));
+    t.addEventListener('keydown', e=>{
+      if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      setMode(next.dataset.mode);
+      next.focus();
+    });
+  });
+  setMode('draw');
+
+  /* ---------- draw ---------- */
+  const pad = document.getElementById('sigPad');
+  const ctx = pad.getContext('2d');
+  ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.strokeStyle = '#111';
+  let drawing = false, hasDrawn = false;
+
+  function pos(e){
+    const r = pad.getBoundingClientRect();
+    const t = (e.touches && e.touches[0]) || e;
+    return [(t.clientX - r.left) * (pad.width / r.width), (t.clientY - r.top) * (pad.height / r.height)];
+  }
+  pad.addEventListener('mousedown', e=>{drawing=true; const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y);});
+  pad.addEventListener('mousemove', e=>{ if(!drawing) return; const [x,y]=pos(e); ctx.lineTo(x,y); ctx.stroke(); hasDrawn=true;});
+  window.addEventListener('mouseup', ()=>drawing=false);
+  pad.addEventListener('touchstart', e=>{e.preventDefault(); drawing=true; const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y);},{passive:false});
+  pad.addEventListener('touchmove', e=>{e.preventDefault(); if(!drawing) return; const [x,y]=pos(e); ctx.lineTo(x,y); ctx.stroke(); hasDrawn=true;},{passive:false});
+  pad.addEventListener('touchend', ()=>drawing=false);
+  document.getElementById('clearSig').addEventListener('click', ()=>{
+    ctx.clearRect(0,0,pad.width,pad.height);
+    hasDrawn = false;
+  });
+
+  /* ---------- type ---------- */
+  const typedSig = document.getElementById('typedSig');
+  const typedPreview = document.getElementById('typedPreview');
+  typedSig.addEventListener('input', ()=>{ typedPreview.textContent = typedSig.value.trim(); });
+
+  /* ---------- upload a picture of the signature ---------- */
+  const fileInput = document.getElementById('sigFile');
+  const drop = document.getElementById('sigDrop');
+  const previewWrap = document.getElementById('sigPreviewWrap');
+  const previewImg = document.getElementById('sigPreview');
+  const fileInfo = document.getElementById('sigFileInfo');
+  const uploadMsg = document.getElementById('sigUploadMsg');
+  let uploadedData = '';
+  let uploadedName = '';
+
+  function setUploadMsg(text, isError){
+    uploadMsg.textContent = text;
+    uploadMsg.classList.toggle('error', !!isError);
+  }
+
+  function resetUpload(){
+    uploadedData = '';
+    uploadedName = '';
+    fileInput.value = '';
+    previewWrap.hidden = true;
+    previewImg.removeAttribute('src');
+    drop.hidden = false;
+    fileInfo.textContent = '';
+    setUploadMsg('');
+  }
+
+  function loadImage(file){
+    return new Promise((resolve, reject)=>{
+      function fallback(){
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('read')); };
+        img.src = url;
+      }
+      if(window.createImageBitmap){
+        createImageBitmap(file, {imageOrientation:'from-image'}).then(resolve).catch(fallback);
+      } else {
+        fallback();
+      }
+    });
+  }
+
+  function contentBox(source, w, h){
+    let data;
+    try { data = source.getImageData(0, 0, w, h).data; } catch(e){ return null; }
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for(let y=0; y<h; y++){
+      for(let x=0; x<w; x++){
+        const i = (y * w + x) * 4;
+        const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+        // Treat only clearly non-white, visible pixels as ink.
+        if(a > 40 && (r < 240 || g < 240 || b < 240)){
+          if(x < minX) minX = x;
+          if(x > maxX) maxX = x;
+          if(y < minY) minY = y;
+          if(y > maxY) maxY = y;
+        }
+      }
+    }
+    if(maxX < 0) return null;
+    return {x:minX, y:minY, w:maxX-minX+1, h:maxY-minY+1};
+  }
+
+  function cleanSignature(src){
+    const MAX_W = 900, MAX_H = 360;
+    const scale = Math.min(1, MAX_W / src.width, MAX_H / src.height);
+    const w = Math.max(1, Math.round(src.width * scale));
+    const h = Math.max(1, Math.round(src.height * scale));
+
+    const base = document.createElement('canvas');
+    base.width = w; base.height = h;
+    const bctx = base.getContext('2d', {willReadFrequently:true});
+    bctx.fillStyle = '#fff';
+    bctx.fillRect(0, 0, w, h);
+    bctx.drawImage(src, 0, 0, w, h);
+
+    const box = contentBox(bctx, w, h);
+    const cropped = box && box.w > 20 && box.h > 10 && (box.w < w - 4 || box.h < h - 4);
+    if(!cropped) return base;
+
+    const padPx = 8;
+    const out = document.createElement('canvas');
+    out.width = box.w + padPx * 2;
+    out.height = box.h + padPx * 2;
+    const octx = out.getContext('2d');
+    octx.fillStyle = '#fff';
+    octx.fillRect(0, 0, out.width, out.height);
+    octx.drawImage(base, box.x, box.y, box.w, box.h, padPx, padPx, box.w, box.h);
+    return out;
+  }
+
+  async function handleFile(file){
+    if(!file) return;
+    fileInput.value = ''; // allow picking the same file again; the cleaned image is what gets submitted
+    if(!/^image\/(png|jpeg|webp)$/i.test(file.type)){
+      setUploadMsg('That file is not a PNG, JPG, or WebP image. Please choose another picture.', true);
+      return;
+    }
+    if(file.size > 8 * 1024 * 1024){
+      setUploadMsg('That picture is too big (over 8 MB). Please choose a smaller photo.', true);
+      return;
+    }
+    setUploadMsg('Preparing your signature…');
+    try {
+      const img = await loadImage(file);
+      const cleaned = cleanSignature(img);
+      let data = cleaned.toDataURL('image/png');
+      const encoded = data.slice(data.indexOf(',') + 1);
+      // Keep stored images light: switch large photos/scans to JPEG.
+      if(encoded.length * 0.75 > 450 * 1024){
+        data = cleaned.toDataURL('image/jpeg', 0.9);
+      }
+      uploadedData = data;
+      uploadedName = file.name;
+      previewImg.src = data;
+      fileInfo.textContent = file.name;
+      previewWrap.hidden = false;
+      drop.hidden = true;
+      setUploadMsg('Signature picture added. It will appear on your approval.', false);
+    } catch(err){
+      setUploadMsg('We could not read that picture. Please try another photo.', true);
+    }
+  }
+
+  fileInput.addEventListener('change', ()=>handleFile(fileInput.files && fileInput.files[0]));
+  document.getElementById('replaceSig').addEventListener('click', ()=>fileInput.click());
+  document.getElementById('removeSig').addEventListener('click', resetUpload);
+  drop.addEventListener('click', ()=>fileInput.click());
+  drop.addEventListener('keydown', e=>{
+    if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); fileInput.click(); }
+  });
+  ['dragenter','dragover'].forEach(evt=>drop.addEventListener(evt, e=>{
+    e.preventDefault(); drop.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(evt=>drop.addEventListener(evt, e=>{
+    e.preventDefault(); drop.classList.remove('dragover');
+  }));
+  drop.addEventListener('drop', e=>{
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(file) handleFile(file);
+  });
+  document.addEventListener('paste', e=>{
+    if(mode !== 'upload') return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const items = e.clipboardData && e.clipboardData.items;
+    if(!items) return;
+    for(const item of items){
+      if(item.type && item.type.startsWith('image/')){
+        e.preventDefault();
+        handleFile(item.getAsFile());
+        break;
+      }
+    }
+  });
+
+  /* ---------- submit ---------- */
+  form.addEventListener('submit', e=>{
+    if(actionSel.value !== 'approved'){
+      sigData.value = '';
+      return;
+    }
+    if(mode === 'draw'){
+      if(hasDrawn){
+        sigData.value = pad.toDataURL('image/png');
+        return;
+      }
+      e.preventDefault();
+      alert('Please draw your signature, or choose “Type” or “Upload photo”.');
+    } else if(mode === 'type'){
+      const typed = typedSig.value.trim();
+      if(typed){
+        sigData.value = 'TEXT:' + typed;
+        return;
+      }
+      e.preventDefault();
+      typedSig.focus();
+      alert('Please type your name as your signature, or choose “Draw” or “Upload photo”.');
+    } else {
+      if(uploadedData){
+        sigData.value = uploadedData;
+        return;
+      }
+      e.preventDefault();
+      alert('Please upload a picture of your signature, or choose “Draw” or “Type”.');
+    }
+  });
+})();
+</script>
+{% endblock %}

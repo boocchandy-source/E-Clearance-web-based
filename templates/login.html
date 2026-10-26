@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="auth-split">
+  <aside class="auth-side">
+    <img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="TCC shield">
+    <h2>Welcome back.</h2>
+    <p>One portal for students and faculty. Pick your role, sign in, and pick up right where you left off.</p>
+    <ul class="auth-points">
+      <li>Students track every office and instructor signature live</li>
+      <li>Faculty review their office or subject queue only</li>
+      <li>Approvals carry a real e-signature</li>
+    </ul>
+  </aside>
+  <div class="auth-card">
+    <h2>Login</h2>
+    <p class="muted">Use your TCC account to continue.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab {% if active_role != 'faculty' %}active{% endif %}" data-role="student" role="tab">Student</button>
+      <button type="button" class="tab {% if active_role == 'faculty' %}active{% endif %}" data-role="faculty" role="tab">Faculty</button>
+    </div>
+    <form method="POST" action="{{ url_for('login') }}" class="form" id="loginForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="role" id="roleInput" value="{{ active_role }}">
+      <label for="email">Email
+        <input id="email" type="email" name="email" required placeholder="you@tcc.edu" autocomplete="username">
+      </label>
+      <label for="password">Password
+        <input id="password" type="password" name="password" required placeholder="Enter your password" autocomplete="current-password">
+      </label>
+      <button class="btn btn-dark btn-block btn-lg" type="submit">Sign in</button>
+    </form>
+    <p class="muted center">New here? <a class="link" href="{{ url_for('register') }}">Create an account</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('roleInput').value = t.dataset.role;
+  });
+});
+</script>
+{% endblock %}

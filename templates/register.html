@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<div class="auth-split">
+  <aside class="auth-side">
+    <img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="TCC shield">
+    <h2>Join eClearance.</h2>
+    <p>Students file clearances in minutes. Faculty get a clean queue for their office &mdash; nothing else.</p>
+    <ul class="auth-points">
+      <li>Student accounts track course &amp; year</li>
+      <li>Faculty accounts bind to one office</li>
+      <li>Signatures stay attached to every file</li>
+    </ul>
+  </aside>
+  <div class="auth-card wide">
+    <h2>Create account</h2>
+    <p class="muted">Choose your role to show the right fields.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab active" data-role="student" role="tab">Student</button>
+      {% if faculty_signup_enabled %}
+      <button type="button" class="tab" data-role="faculty" role="tab">Faculty</button>
+      {% endif %}
+    </div>
+    {% if not faculty_signup_enabled %}
+    <p class="muted small">Faculty accounts are provisioned by the school administrator. Students can register below.</p>
+    {% endif %}
+    <form method="POST" class="form grid-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="role" id="roleInput" value="student">
+      <label for="fn">Full name *<input id="fn" name="full_name" required placeholder="Juan Dela Cruz" autocomplete="name"></label>
+      <label for="sid">ID number *<input id="sid" name="school_id" required placeholder="STU-2021-0001 or FAC-REG-001" autocomplete="off"></label>
+      <label for="em">Email *<input id="em" type="email" name="email" required placeholder="you@tcc.edu" autocomplete="email"></label>
+      <label for="pw">Password *<input id="pw" type="password" name="password" required placeholder="Create a password" autocomplete="new-password"></label>
+      <div id="studentFields" class="grid-2 span-2">
+        <label for="course">Course
+          <select id="course" name="course">
+            <option value="">Select course</option>
+            <option value="BSIT">BSIT — Bachelor of Science in Information Technology</option>
+            <option value="BSCRIM">BSCRIM — Bachelor of Science in Criminal Justice</option>
+            <option value="BSBA">BSBA — Bachelor of Science in Business Administration</option>
+          </select>
+        </label>
+        <label for="yl">Year level
+          <select id="yl" name="year_level">
+            <option value="">Select year level</option>
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+          </select>
+        </label>
+      </div>
+      <div id="facultyFields" class="hidden span-2">
+        <label for="deptSelect">Department / office *
+          <select name="department" id="deptSelect">
+            <option value="">Select your office</option>
+            {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+          </select>
+        </label>
+        {% if faculty_code_required %}
+        <label for="facultyCode">Faculty access code *
+          <input id="facultyCode" name="faculty_code" type="password" autocomplete="off" placeholder="Provided by the administrator">
+        </label>
+        {% endif %}
+        <p class="muted small">Your dashboard will show only requests waiting on this office.</p>
+      </div>
+      <button class="btn btn-gold btn-block btn-lg span-2" type="submit">Create account</button>
+    </form>
+    <p class="center muted">Already registered? <a class="link" href="{{ url_for('login') }}">Sign in</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const r = t.dataset.role;
+    document.getElementById('roleInput').value = r;
+    document.getElementById('studentFields').classList.toggle('hidden', r!=='student');
+    document.getElementById('facultyFields').classList.toggle('hidden', r!=='faculty');
+  });
+});
+</script>
+{% endblock %}

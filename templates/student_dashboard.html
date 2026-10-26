@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard{% endblock %}
+{% block content %}
+<div class="dash-shell">
+<div class="dash-app">
+  <!-- sidebar -->
+  <aside class="dash-side" aria-label="Student navigation">
+    <div class="dash-logo"><img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="TCC"> eClearance <small>v.01</small></div>
+    <a class="side-link active" href="{{ url_for('student_dashboard') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      Dashboard <span class="chev">›</span></a>
+    <a class="side-link" href="#requests">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+      My Requests <span class="chev">›</span></a>
+    <button class="side-link js-new-request" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New Request <span class="chev">›</span></button>
+    <a class="side-link" href="{{ url_for('logout') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.8.3-1.4 1-1.4 1.9"/><circle cx="12" cy="17" r=".5" fill="currentColor"/></svg>
+      Help <span class="chev">›</span></a>
+    <div class="side-user"><span class="avatar">{{ user['full_name'][0] }}</span><div><b>{{ user['full_name'] }}</b><small>{{ user['school_id'] }} · Student</small></div></div>
+  </aside>
+
+  <!-- main -->
+  <div class="dash-main">
+    <div class="dash-top">
+      <div><h2>Hello, {{ user['full_name'].split(' ')[0] }}</h2><p class="sub">{{ user['course'] }} {{ user['year_level'] }} · track every signature live</p></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="search-pill"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="topSearch" placeholder="Search" aria-label="Search requests"></label>
+        <button class="btn btn-gold js-new-request" type="button">+ New request</button>
+      </div>
+    </div>
+
+    {% set ns = namespace(total=0, approved=0, cleared=0, attention=0) %}
+    {% for item in clearances %}
+      {% set ns.total = ns.total + 1 %}
+      {% set ns.approved = ns.approved + item.approved %}
+      {% if item.cleared %}{% set ns.cleared = ns.cleared + 1 %}{% endif %}
+      {% if item.row['status'] == 'needs_revision' %}{% set ns.attention = ns.attention + 1 %}{% endif %}
+    {% endfor %}
+
+    <div class="stat-band four" role="list">
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></span>
+        <div><small>Total Requests</small><strong>{{ ns.total }}</strong><span class="stat-delta up">{{ departments|length }} offices{% if has_instructors %} + {{ instructor_count }} instructors{% endif %} each</span></div>
+      </div>
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+        <div><small>Signatures collected</small><strong>{{ ns.approved }}</strong><span class="stat-delta up">across all requests</span></div>
+      </div>
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span>
+        <div><small>Cleared</small><strong>{{ ns.cleared }}</strong><span class="stat-delta up">{{ 'ready to print' if ns.cleared else 'none yet' }}</span></div>
+      </div>
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg></span>
+        <div><small>Needs action</small><strong>{{ ns.attention }}</strong><span class="stat-delta {{ 'down' if ns.attention else 'up' }}">{{ 'revise & resubmit' if ns.attention else 'all clear' }}</span></div>
+      </div>
+    </div>
+
+    <div class="panel" id="requests">
+      <div class="panel-head">
+        <div><h3>All Requests</h3><p class="active-line">Status updates automatically · Cleared = all {{ required_total }} assigned signatories signed</p></div>
+        <div class="panel-tools">
+          <label class="mini-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="filterInput" placeholder="Search" aria-label="Search table"></label>
+          <select class="sortsel" id="sortSel" aria-label="Sort requests"><option value="new">Sort by: Newest</option><option value="old">Sort by: Oldest</option></select>
+        </div>
+      </div>
+      <div class="table-wrap">
+      <table class="table" id="reqTable">
+        <thead><tr><th>Clearance</th><th>School Year</th><th>Semester</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for item in clearances %}
+        {% set c = item.row %}
+          <tr data-id="{{ c['id'] }}">
+            <td class="cell-main"><b>#{{ c['id'] }} · {{ c['purpose'] }}</b><small>Filed {{ c['created_at'] }}</small></td>
+            <td>{{ c['school_year'] }}</td>
+            <td>{{ c['semester'] }}</td>
+            <td><div class="progress">{{ item.approved }}/{{ item.total }}</div><div class="progress-bar"><div style="width:{{ (item.approved/item.total*100)|round }}%"></div></div></td>
+            <td>
+              {% if item.cleared %}<span class="pill pill-active">Cleared</span>
+              {% elif c['status'] == 'needs_revision' %}<span class="pill pill-inactive">Needs revision</span>
+              {% else %}<span class="pill pill-pending">{{ c['status']|status_label }}</span>{% endif %}
+            </td>
+            <td><div class="cell-actions">
+              <a class="btn btn-sm btn-dark" href="{{ url_for('clearance_view', cid=c['id']) }}">View</a>
+              {% if item.cleared %}<a class="btn btn-sm btn-outline" href="{{ url_for('certificate', cid=c['id']) }}" target="_blank" rel="noopener">Print</a>{% endif %}
+            </div></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="center muted">No requests yet — file your first one above.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    {% for item in clearances %}
+    {% set c = item.row %}
+    <div class="card clearance-card">
+      <div class="cc-top">
+        <div><p class="eyebrow">Clearance #{{ c['id'] }}</p><h3>{{ c['purpose'] }}</h3>
+        <p class="muted small">{{ c['school_year'] }} · {{ c['semester'] }} · <span class="badge {{ 'completed' if item.cleared else c['status'] }}">{{ 'Cleared' if item.cleared else c['status']|status_label }}</span></p></div>
+        <div class="cell-actions">
+          <a class="btn btn-sm btn-dark" href="{{ url_for('clearance_view', cid=c['id']) }}">Open signatures</a>
+          {% if item.cleared %}<a class="btn btn-sm btn-gold" href="{{ url_for('certificate', cid=c['id']) }}" target="_blank" rel="noopener">Print clearance</a>{% endif %}
+        </div>
+      </div>
+      <div class="sign-grid">
+        {% for d in departments %}
+          {% set a = item.approvals.get(d) %}
+          <div class="sign-cell {{ a['status'] if a else 'pending' }}">
+            <span class="cell-num">{{ loop.index }}/{{ departments|length }}</span>
+            <b>{{ d }}</b><br>
+            {% if a and a['status']=='approved' %}
+              <span class="badge approved">Signed</span>
+              {% if a['signature_data'] and a['signature_data'].startswith('data:') %}
+                <img src="{{ a['signature_data'] }}" class="sig-thumb" alt="E-signature on file for {{ d }}">
+              {% elif a['signature_data'] and a['signature_data'].startswith('TEXT:') %}
+                <div class="sig-typed">{{ a['signature_data'][5:] }}</div>
+              {% endif %}
+            {% elif a and a['status']=='declined' %}
+              <span class="badge declined">Declined</span><br><small>{{ a['remarks'] }}</small>
+            {% else %}
+              <span class="badge pending">Waiting</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% if item.instructor_rows %}
+      <h4 class="sig-subtitle">Subject instructors · {{ item.instructor_rows|length }} subjects</h4>
+      <div class="sign-grid">
+        {% for a in item.instructor_rows %}
+          <div class="sign-cell {{ a['status'] }}">
+            <span class="cell-num">{{ loop.index }}/{{ item.instructor_rows|length }}</span>
+            <b>{{ a['subject'] }}</b><br>
+            <small class="muted">{{ a['instructor_name'] }}</small><br>
+            {% if a['status']=='approved' %}
+              <span class="badge approved">Signed</span>
+              {% if a['signature_data'] and a['signature_data'].startswith('data:') %}
+                <img src="{{ a['signature_data'] }}" class="sig-thumb" alt="E-signature of {{ a['instructor_name'] }}">
+              {% elif a['signature_data'] and a['signature_data'].startswith('TEXT:') %}
+                <div class="sig-typed">{{ a['signature_data'][5:] }}</div>
+              {% endif %}
+            {% elif a['status']=='declined' %}
+              <span class="badge declined">Declined</span><br><small>{{ a['remarks'] }}</small>
+            {% else %}
+              <span class="badge pending">Waiting</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+</div>
+
+<dialog id="reqModal" class="modal" aria-labelledby="reqTitle">
+  <form method="POST" action="{{ url_for('student_request') }}" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p class="eyebrow">New clearance</p>
+    <h3 id="reqTitle">Where is this clearance for?</h3>
+    <p class="muted small">Filed once, routed through all {{ departments|length }} offices in official order.</p>
+    <div class="grid-2">
+      <label for="sy">School year<input id="sy" name="school_year" value="2025-2026" required></label>
+      <label for="sem">Semester
+        <select id="sem" name="semester"><option>1st Semester</option><option>2nd Semester</option><option>Summer</option></select>
+      </label>
+    </div>
+    <label for="purpose">Purpose
+      <select id="purpose" name="purpose"><option>Enrollment / Graduation Clearance</option><option>Graduation</option><option>Enrollment</option><option>Transfer / Good Moral</option><option>Board Exam Requirement</option></select>
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="btn btn-dark">Send to all offices</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  document.querySelectorAll('.js-new-request').forEach(b=>b.addEventListener('click',()=>document.getElementById('reqModal').showModal()));
+  const f=document.getElementById('filterInput'), t=document.getElementById('topSearch');
+  function apply(q){document.querySelectorAll('#reqTable tbody tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});}
+  if(f) f.addEventListener('input',()=>{apply(f.value.toLowerCase()); if(t) t.value=f.value;});
+  if(t) t.addEventListener('input',()=>{apply(t.value.toLowerCase()); if(f) f.value=t.value;});
+  const s=document.getElementById('sortSel');
+  if(s) s.addEventListener('change',()=>{
+    const tb=document.querySelector('#reqTable tbody'); const rows=[...tb.querySelectorAll('tr[data-id]')];
+    rows.sort((a,b)=> s.value==='old' ? (+a.dataset.id-+b.dataset.id) : (+b.dataset.id-+a.dataset.id));
+    rows.forEach(r=>tb.appendChild(r));
+  });
+})();
+</script>
+{% endblock %}

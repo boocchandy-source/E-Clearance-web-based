@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Faculty Dashboard{% endblock %}
+{% block content %}
+<div class="dash-shell">
+<div class="dash-app">
+  <aside class="dash-side" aria-label="Faculty navigation">
+    <div class="dash-logo"><img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="TCC"> eClearance <small>v.01</small></div>
+    <a class="side-link active" href="{{ url_for('faculty_dashboard') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      Dashboard <span class="chev">›</span></a>
+    <a class="side-link" href="#queue">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+      Review Queue <span class="chev">›</span></a>
+    <a class="side-link" href="{{ url_for('logout') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.8.3-1.4 1-1.4 1.9"/><circle cx="12" cy="17" r=".5" fill="currentColor"/></svg>
+      Help <span class="chev">›</span></a>
+    <div class="side-user"><span class="avatar">{{ user['full_name'][0] }}</span><div><b>{{ user['full_name'] }}</b><small>{{ scope_label }}</small></div></div>
+  </aside>
+
+  <div class="dash-main">
+    <div class="dash-top">
+      <div><h2>Hello, {{ user['full_name'].split(' ')[0] }}</h2><p class="sub">{{ scope_label }} · {{ user['school_id'] }}</p></div>
+      <label class="search-pill"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="topSearch" placeholder="Search" aria-label="Search queue"></label>
+    </div>
+
+    <div class="stat-band" role="list">
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></span>
+        <div><small>Total Assigned</small><strong>{{ stats.total }}</strong><span class="stat-delta up">{{ 'your subject queue' if is_instructor else 'your office queue' }}</span></div>
+      </div>
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+        <div><small>Pending Review</small><strong>{{ stats.pending }}</strong><span class="stat-delta {{ 'down' if stats.pending else 'up' }}">{{ 'needs e-sign' if stats.pending else 'all caught up' }}</span></div>
+      </div>
+      <div class="stat-cell" role="listitem">
+        <span class="stat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+        <div><small>You Approved</small><strong>{{ stats.approved }}</strong><span class="stat-delta up">{{ stats.declined }} declined</span></div>
+      </div>
+    </div>
+
+    <div class="panel" id="queue">
+      <div class="panel-head">
+        <div><h3>Review Queue</h3><p class="active-line">{{ scope_label }} · approve with e-signature</p></div>
+        <div class="panel-tools">
+          <label class="mini-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="filterInput" placeholder="Search" aria-label="Search table"></label>
+          <select class="sortsel" id="sortSel" aria-label="Sort queue"><option value="new">Sort by: Newest</option><option value="old">Sort by: Oldest</option></select>
+        </div>
+      </div>
+      <div class="table-wrap">
+      <table class="table" id="reqTable">
+        <thead><tr><th>Student</th>{% if is_instructor %}<th>Subject</th>{% endif %}<th>Course</th><th>SY / Sem</th><th>Purpose</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr data-id="{{ r['id'] }}">
+            <td class="cell-main"><b>{{ r['student_name'] }}</b><small>#{{ r['id'] }} · {{ r['student_no'] }}</small></td>
+            {% if is_instructor %}<td><b>{{ r['my_subject'] }}</b></td>{% endif %}
+            <td><small>{{ r['course'] }} {{ r['year_level'] }}</small></td>
+            <td><small>{{ r['school_year'] }}<br>{{ r['semester'] }}</small></td>
+            <td><small>{{ r['purpose'] }}</small></td>
+            <td>
+              {% if r['my_status'] == 'approved' %}<span class="pill pill-active">Signed</span>
+              {% elif r['my_status'] == 'declined' %}<span class="pill pill-inactive">Declined</span>
+              {% else %}<span class="pill pill-pending">Pending</span>{% endif %}
+            </td>
+            <td><a class="btn btn-sm btn-dark" href="{{ url_for('clearance_view', cid=r['id']) }}">Review</a></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="{{ 7 if is_instructor else 6 }}" class="center muted">No requests assigned to {{ 'your subjects' if is_instructor else 'your office' }} yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const f=document.getElementById('filterInput'), t=document.getElementById('topSearch');
+  function apply(q){document.querySelectorAll('#reqTable tbody tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});}
+  if(f) f.addEventListener('input',()=>{apply(f.value.toLowerCase()); if(t) t.value=f.value;});
+  if(t) t.addEventListener('input',()=>{apply(t.value.toLowerCase()); if(f) f.value=t.value;});
+  const s=document.getElementById('sortSel');
+  if(s) s.addEventListener('change',()=>{
+    const tb=document.querySelector('#reqTable tbody'); const rows=[...tb.querySelectorAll('tr[data-id]')];
+    rows.sort((a,b)=> s.value==='old' ? (+a.dataset.id-+b.dataset.id) : (+b.dataset.id-+a.dataset.id));
+    rows.forEach(r=>tb.appendChild(r));
+  });
+})();
+</script>
+{% endblock %}

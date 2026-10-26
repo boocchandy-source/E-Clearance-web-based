@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow"><span class="dot"></span> Official clearance portal &middot; Torres Capitol College</span>
+    <h1>Clearance, <em>signed</em> in one place.</h1>
+    <p class="lead">Students file a single request. Sixteen offices &mdash; plus nine 2nd Year subject instructors &mdash; review, e-sign, and release it &mdash; no paper routing, no lost forms, full audit trail.</p>
+    <div class="hero-actions">
+      <a href="{{ url_for('login', role='student') }}" class="btn btn-gold btn-lg">Student login
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a href="{{ url_for('login', role='faculty') }}" class="btn btn-dark btn-lg">Faculty login</a>
+    </div>
+    <dl class="hero-stats">
+      <div><dt>16</dt><dd>offices in flow</dd></div>
+      <div><dt>100%</dt><dd>digital trail</dd></div>
+      <div><dt>E-sign</dt><dd>on every approval</dd></div>
+    </dl>
+  </div>
+  <div class="hero-panel">
+    <img src="{{ url_for('static', filename='img/tcc_logo.jpg') }}" alt="TCC shield">
+    <div class="hero-panel-card">
+      <strong>How it works</strong>
+      <ol>
+        <li>Student submits <b>one</b> request</li>
+        <li>Offices 1&rarr;16 review &amp; e-sign</li>
+        <li>System issues the certificate</li>
+      </ol>
+      <a class="link" href="{{ url_for('register') }}">Create an account &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<section class="steps">
+  <article class="card step">
+    <span class="step-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
+    <h3>Submit once</h3>
+    <p>One form &mdash; school year, semester, purpose &mdash; routed automatically to all 16 offices, plus the 9 subject instructors for 2nd Year.</p>
+  </article>
+  <article class="card step">
+    <span class="step-icon gold" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2"/></svg></span>
+    <h3>Offices e-sign</h3>
+    <p>Each reviewer approves with a drawn, typed, or uploaded e-signature, or declines with remarks to comply.</p>
+  </article>
+  <article class="card step">
+    <span class="step-icon dark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="M22 4L12 14l-3-3"/></svg></span>
+    <h3>Get certified</h3>
+    <p>All required approvals complete the file. Download or print the certificate with every office and instructor signature.</p>
+  </article>
+</section>
+
+<section class="card flow-card">
+  <div class="flow-head">
+    <div>
+      <p class="eyebrow">Sequential flow &middot; 1 &rarr; 16</p>
+      <h2>Sixteen offices. Zero paper.</h2>
+      <p class="muted">Requests travel the official order below. Declined steps notify the student to comply, then revise and resubmit.</p>
+    </div>
+    <a href="{{ url_for('login', role='student') }}" class="btn btn-dark">Start a request</a>
+  </div>
+  <ol class="flow-track">
+    {% for d in departments %}
+    <li class="flow-stop"><span class="flow-num">{{ loop.index }}</span><span>{{ d }}</span></li>
+    {% endfor %}
+  </ol>
+  <p class="muted small center">2nd Year BSIT students also collect nine subject-instructor e-signatures before the certificate unlocks.</p>
+</section>
+{% endblock %}
